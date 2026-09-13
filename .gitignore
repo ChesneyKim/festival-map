@@ -7,3 +7,4 @@ node_modules/
 *PAT*
 *.token
 *.key
+.vercel

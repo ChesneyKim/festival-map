@@ -32,6 +32,7 @@ body {
   line-height: 1.5;
 }
 button,
+input,
 select {
   font: inherit;
   color: inherit;
@@ -52,11 +53,74 @@ a {
   text-decoration: none;
 }
 button:focus-visible,
+input:focus-visible,
 a:focus-visible,
 select:focus-visible,
 article:focus-visible {
   outline: 2px solid var(--ink);
   outline-offset: 4px;
+}
+.discovery-controls,
+.custom-dates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.custom-dates {
+  margin: 12px 0 0;
+}
+.discovery-controls label {
+  min-width: 0;
+}
+.keyword-field {
+  flex: 1 1 260px;
+}
+.discovery-controls input,
+.discovery-controls select {
+  width: 100%;
+}
+input {
+  cursor: text;
+  min-width: 0;
+  max-width: 100%;
+}
+.saved-card {
+  position: relative;
+}
+.saved-card-actions {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 1;
+}
+.saved-card-actions .save {
+  position: static;
+}
+.load-more {
+  display: block;
+  margin: 24px auto;
+}
+.map-message button {
+  display: block;
+  margin: 12px auto 0;
+}
+@media (max-width: 743px) {
+  .discovery-controls > label {
+    flex: 1 1 140px;
+  }
+  .discovery-controls > .keyword-field {
+    flex-basis: 100%;
+  }
+  .custom-dates > label {
+    flex: 1 1 120px;
+    min-width: 0;
+  }
+  .custom-dates input {
+    width: 100%;
+    padding: 10px;
+  }
 }
 select:focus-visible {
   outline-offset: 0;
@@ -486,6 +550,17 @@ main {
   text-decoration: underline;
   font-weight: 500;
 }
+.card-content .schedule-note {
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 8px 0 0;
+}
+.schedule-note a {
+  color: var(--accent-ink);
+  text-decoration: underline;
+  display: inline-block;
+  padding: 6px 0;
+}
 .empty {
   padding: 64px 24px;
   text-align: center;
@@ -788,6 +863,9 @@ footer small {
   .segments button {
     flex: 1;
     min-height: 44px;
+    padding: 6px 8px;
+    white-space: nowrap;
+    border-radius: 8px;
   }
   .region-field {
     border: 0;
