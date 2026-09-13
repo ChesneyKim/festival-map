@@ -15,7 +15,7 @@
 
 # Project Context
 
-A mobile-first festival map for planning a date. Next.js, TypeScript, Supabase, Kakao Maps, Vercel.
+A mobile-first festival map for couples and families planning an outing. Next.js, TypeScript, Supabase, Kakao Maps, Vercel.
 
 # Standards & References
 

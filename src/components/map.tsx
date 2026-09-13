@@ -59,9 +59,11 @@ export function FestivalMap({
     instance = useRef<MapInstance | null>(null);
   const [ready, setReady] = useState(false),
     [error, setError] = useState("");
+  const [retry, setRetry] = useState(0);
   const key = process.env.NEXT_PUBLIC_KAKAO_MAP_APP_KEY;
   useEffect(() => {
     if (!key) return;
+    setError("");
     let active = true;
     loadMaps(key)
       .then((m) => {
@@ -73,13 +75,16 @@ export function FestivalMap({
           setReady(true);
         }
       })
-      .catch(() =>
-        setError("지도를 불러오지 못했어요. 아래 목록에서 축제를 살펴보세요."),
-      );
+      .catch(() => {
+        if (active)
+          setError(
+            "지도를 불러오지 못했어요. 아래 목록에서 축제를 살펴보세요.",
+          );
+      });
     return () => {
       active = false;
     };
-  }, [key]);
+  }, [key, retry]);
   useEffect(() => {
     if (!ready || !instance.current || !window.kakao) return;
     const m = window.kakao.maps,
@@ -132,6 +137,11 @@ export function FestivalMap({
                 "지도 연결을 준비하고 있어요. 아래 목록은 바로 둘러볼 수 있어요."}
             </p>
             <small>현재 배경은 실제 지도가 아닌 미리보기입니다.</small>
+            {error && (
+              <button onClick={() => setRetry((n) => n + 1)}>
+                지도 다시 연결
+              </button>
+            )}
           </div>
         </div>
       )}

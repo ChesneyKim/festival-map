@@ -23,6 +23,7 @@ export default async function Page({
         <Link href="/" className="brand">
           ✳ 모두의 페스타
         </Link>
+        <Link href="/saved">저장한 축제 ♡</Link>
         <Link href="/">← 축제 지도로 돌아가기</Link>
       </header>
       <main className="detail">
@@ -117,8 +118,14 @@ export default async function Page({
             </div>
           </section>
           <aside className="visit-card" aria-label="방문 계획">
-            <h2>우리의 다음 데이트</h2>
+            <h2>이번 나들이 계획</h2>
             <p>{f.eventPlace || f.address || "장소 확인 중"}</p>
+            <p className="schedule-note">
+              운영 요일·시간: {f.performanceTime || "공식 정보가 아직 없어요"}
+            </p>
+            <p className="schedule-note">
+              행사 기간에 포함되어도 매일 운영하지 않을 수 있어요.
+            </p>
             <div className="visit-dates">
               <div>
                 <small>시작일</small>

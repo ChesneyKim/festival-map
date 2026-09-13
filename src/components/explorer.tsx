@@ -3,12 +3,20 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   dateRange,
-  distance,
+  today,
   type FestivalSummary,
   type Region,
 } from "@/lib/domain";
+import {
+  discover,
+  isLongRunning,
+  validRange,
+  type SortOrder,
+  type DurationFilter,
+} from "@/lib/discovery";
 import { FestivalMap } from "./map";
 import { SaveButton } from "./save-button";
+import { nearbyFestivals, requestPosition } from "@/lib/nearby";
 export function Explorer() {
   const [preset, setPreset] = useState("weekend"),
     [region, setRegion] = useState(""),
@@ -24,26 +32,54 @@ export function Explorer() {
     [error, setError] = useState(""),
     [retry, setRetry] = useState(0),
     [searchOpen, setSearchOpen] = useState(false);
+  const [district, setDistrict] = useState("");
+  const [query, setQuery] = useState("");
+  const [duration, setDuration] = useState<DurationFilter>("all");
+  const [sort, setSort] = useState<SortOrder>("ending");
+  const [customStart, setCustomStart] = useState("");
+  const [customEnd, setCustomEnd] = useState("");
+  const [regionError, setRegionError] = useState(false);
+  const range =
+    preset === "custom"
+      ? { start: customStart, end: customEnd }
+      : dateRange(preset);
+  const rangeOK = validRange(range.start, range.end);
+  const provinces = Array.from(
+    new Map(regions.map((r) => [r.code, r])).values(),
+  );
+  const districts = regions.filter(
+    (r) => r.code === region && r.districtCode && r.districtName,
+  );
   useEffect(() => {
     fetch("/api/regions")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
       .then((r) =>
         setRegions(
-          Array.from(
-            new Map<string, Region>(
-              (r.items || []).map((x: Region) => [x.code, x]),
-            ).values(),
+          (r.items || []).map(
+            (
+              x: Region & { district_code?: string; district_name?: string },
+            ) => ({
+              ...x,
+              districtCode: x.districtCode ?? x.district_code,
+              districtName: x.districtName ?? x.district_name,
+            }),
           ),
         ),
       )
-      .catch(() => {});
+      .catch(() => setRegionError(true));
   }, []);
   useEffect(() => {
     const controller = new AbortController();
     setBusy(true);
     setError("");
     setItems([]);
-    const range = dateRange(preset);
+    if (!rangeOK) {
+      setBusy(false);
+      return () => controller.abort();
+    }
     (async () => {
       let all: FestivalSummary[] = [];
       let page = 1,
@@ -52,7 +88,8 @@ export function Explorer() {
         const res = await fetch(
           "/api/festivals?" +
             new URLSearchParams({
-              ...range,
+              start: range.start,
+              end: range.end,
               regionCode: region,
               page: String(page++),
               limit: "100",
@@ -78,24 +115,17 @@ export function Explorer() {
       }
     });
     return () => controller.abort();
-  }, [preset, region, retry]);
+  }, [range.start, range.end, rangeOK, region, retry]);
   const nearby = useMemo(
     () =>
-      items
-        .map((f) => ({
-          ...f,
-          km:
-            position && f.latitude !== null && f.longitude !== null
-              ? distance(...position, f.latitude, f.longitude)
-              : null,
-        }))
-        .filter((f) => !position || (f.km !== null && f.km <= radius))
-        .sort((a, b) =>
-          position
-            ? (a.km ?? Infinity) - (b.km ?? Infinity)
-            : a.startDate.localeCompare(b.startDate),
-        ),
-    [items, position, radius],
+      discover(nearbyFestivals(items, position, radius), {
+        query,
+        district,
+        duration,
+        sort,
+        date: today(),
+      }),
+    [items, position, radius, query, district, duration, sort],
   );
   const select = useCallback((id: string) => {
     setSelected(id);
@@ -103,56 +133,52 @@ export function Explorer() {
       .getElementById("card-" + id)
       ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, []);
-  function locate() {
-    if (!navigator.geolocation) {
+  async function locate() {
+    setLocating(true);
+    setNotice("위치를 확인하고 있어요. 브라우저의 권한 요청을 확인해 주세요.");
+    try {
+      setPosition(await requestPosition(navigator.geolocation));
+      setRadius(30);
+      setRegion("");
+      setDistrict("");
+      setSort("distance");
       setNotice(
-        "이 브라우저에서는 위치를 사용할 수 없어요. 지역을 선택해 주세요.",
+        "내 주변 축제를 직선거리로 비교해요. 실제 이동 경로와 다르며 위치는 서버에 저장하지 않아요.",
       );
+    } catch (error) {
       setPosition(null);
       setRegion("");
-      return;
+      setDistrict("");
+      setSort((current) => (current === "distance" ? "ending" : current));
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : "위치를 확인하지 못했어요. 지역을 선택해 주세요.",
+      );
+    } finally {
+      setLocating(false);
     }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (p) => {
-        setPosition([p.coords.latitude, p.coords.longitude]);
-        setRegion("");
-        setNotice(
-          "거리는 직선거리예요. 실제 이동 경로는 길찾기에서 확인해 주세요.",
-        );
-        setLocating(false);
-      },
-      () => {
-        setPosition(null);
-        setRegion("");
-        setNotice(
-          "위치 확인이 어려워요. 전국 축제를 둘러보거나 지역을 선택해 주세요.",
-        );
-        setLocating(false);
-      },
-      { timeout: 10000, maximumAge: 60000 },
-    );
   }
   return (
     <>
       <header className="topbar">
         <Link href="/" className="brand">
-          <span>✳</span> 모두의 페스타 <small>DATE MAP</small>
+          <span>✳</span> 모두의 페스타 <small>FESTIVAL MAP</small>
         </Link>
         <nav className="product-nav" aria-label="주요 메뉴">
           <a href="#festivals">축제 둘러보기</a>
-          <a href="#festival-map">데이트 지도</a>
+          <a href="#festival-map">축제 지도</a>
         </nav>
-        <a href="#festivals" className="nav-link">
-          함께 떠날 곳 찾기 ↗
-        </a>
+        <Link href="/saved" className="nav-link">
+          저장한 축제 ♡
+        </Link>
       </header>
       <main>
         <section className="intro">
           <div>
-            <span className="intro-label">둘만의 주말 노트</span>
+            <span className="intro-label">함께 떠나는 주말</span>
             <h1>이번 주말엔, 여기 어때?</h1>
-            <p>우리 가까이에 있는 축제로, 둘이서 조금 새로운 하루.</p>
+            <p>연인과 가족, 좋아하는 사람들과 축제에서 새로운 하루.</p>
           </div>
         </section>
         {demo && (
@@ -176,8 +202,10 @@ export function Explorer() {
                 ? "오늘"
                 : preset === "month"
                   ? "30일"
-                  : "이번 주말"}{" "}
-              · 둘이서 가볼 만한 축제
+                  : preset === "custom"
+                    ? "날짜 직접 선택"
+                    : "이번 주말"}{" "}
+              · 함께 가볼 만한 축제
             </small>
           </span>
           <span className="search-orb" aria-hidden="true">
@@ -196,36 +224,96 @@ export function Explorer() {
                 ["today", "오늘"],
                 ["weekend", "이번 주말"],
                 ["month", "30일"],
+                ["custom", "직접 선택"],
               ].map(([v, label]) => (
                 <button
                   key={v}
                   aria-pressed={preset === v}
                   className={preset === v ? "active" : ""}
-                  onClick={() => setPreset(v)}
+                  onClick={() => {
+                    if (v === "custom" && !customStart) {
+                      setCustomStart(range.start);
+                      setCustomEnd(range.end);
+                    }
+                    setPreset(v);
+                  }}
                 >
                   {label}
                 </button>
               ))}
             </div>
+            {preset === "custom" && (
+              <form
+                className="custom-dates"
+                key={`${customStart}/${customEnd}`}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const data = new FormData(e.currentTarget);
+                  setCustomStart(String(data.get("start") || ""));
+                  setCustomEnd(String(data.get("end") || ""));
+                }}
+              >
+                <label>
+                  <span className="field-label">시작 날짜</span>
+                  <input
+                    type="date"
+                    name="start"
+                    defaultValue={customStart}
+                    required
+                  />
+                </label>
+                <label>
+                  <span className="field-label">종료 날짜</span>
+                  <input
+                    type="date"
+                    name="end"
+                    defaultValue={customEnd}
+                    required
+                  />
+                </label>
+                <button type="submit">날짜 적용</button>
+              </form>
+            )}
           </div>
           <label className="region-field">
             <span className="field-label">어디로 갈까요?</span>
             <select
               aria-label="지역"
+              disabled={locating}
               value={region}
               onChange={(e) => {
                 setRegion(e.target.value);
+                setDistrict("");
                 setPosition(null);
+                if (sort === "distance") setSort("ending");
+                setNotice("");
               }}
             >
               <option value="">전국 어디든</option>
-              {regions.map((r) => (
+              {provinces.map((r) => (
                 <option key={r.code} value={r.code}>
                   {r.name}
                 </option>
               ))}
             </select>
           </label>
+          {districts.length > 0 && (
+            <label className="region-field">
+              <span className="field-label">시·군·구</span>
+              <select
+                aria-label="시·군·구"
+                value={district}
+                onChange={(e) => setDistrict(e.target.value)}
+              >
+                <option value="">전체</option>
+                {districts.map((r) => (
+                  <option key={r.districtCode} value={r.districtCode}>
+                    {r.districtName}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <button className="nearby" disabled={locating} onClick={locate}>
             ⌖ {locating ? "위치 확인 중…" : "내 주변"}
           </button>
@@ -243,8 +331,10 @@ export function Explorer() {
                 ))}
               </select>
               <button
+                disabled={locating}
                 onClick={() => {
                   setPosition(null);
+                  if (sort === "distance") setSort("ending");
                   setNotice("");
                 }}
               >
@@ -252,6 +342,52 @@ export function Explorer() {
               </button>
             </>
           )}
+        </section>
+        {!rangeOK && (
+          <p role="alert">
+            시작일과 종료일을 확인해 주세요. 조회 기간은 최대 366일이에요.
+          </p>
+        )}
+        {regionError && (
+          <p role="status">
+            지역 목록을 불러오지 못했어요. 전국 검색을 이용하거나 페이지를
+            새로고침해 주세요.
+          </p>
+        )}
+        <section className="discovery-controls" aria-label="검색과 정렬">
+          <label className="keyword-field">
+            <span className="field-label">어떤 축제를 찾으세요?</span>
+            <input
+              type="search"
+              placeholder="축제명 또는 장소 검색"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </label>
+          <label>
+            <span className="field-label">행사 전체 기간</span>
+            <select
+              value={duration}
+              onChange={(e) => setDuration(e.target.value as DurationFilter)}
+            >
+              <option value="all">기간 길이 전체</option>
+              <option value="short">30일 이하 행사</option>
+              <option value="long">31일 이상 행사</option>
+            </select>
+          </label>
+          <label>
+            <span className="field-label">정렬</span>
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortOrder)}
+            >
+              <option value="ending">종료일 가까운 순</option>
+              <option value="starting">개최 예정 먼저</option>
+              <option value="distance" disabled={!position}>
+                가까운 순 · 내 주변 사용
+              </option>
+            </select>
+          </label>
         </section>
         {notice && (
           <p role="status" className="notice">
@@ -268,13 +404,17 @@ export function Explorer() {
               <span>{nearby.length}</span>
             </h2>
             <p>
-              {dateRange(preset).start} — {dateRange(preset).end} ·{" "}
-              {position ? "가까운 순 · 직선거리" : "시작일 순"}
+              {range.start} — {range.end} ·{" "}
+              {sort === "distance"
+                ? "가까운 순 · 직선거리"
+                : sort === "starting"
+                  ? "개최 예정 먼저"
+                  : "종료일 가까운 순"}
             </p>
           </div>
           {busy ? (
             <div className="empty" role="status">
-              주말의 설렘을 찾고 있어요…
+              함께 가볼 축제를 찾고 있어요…
             </div>
           ) : error ? (
             <div className="empty" role="alert">
@@ -288,7 +428,8 @@ export function Explorer() {
             <div className="empty">
               <h3>조금 더 넓게 찾아볼까요?</h3>
               <p>
-                선택한 날짜와 지역에 축제가 없어요. 날짜나 반경을 바꿔보세요.
+                현재 조건에 맞는 축제가 없어요. 검색어, 지역, 날짜나 기간 길이를
+                바꿔보세요.
               </p>
             </div>
           ) : (
@@ -306,7 +447,11 @@ export function Explorer() {
                 >
                   <div className={"card-art art-" + (i % 4)}>
                     {f.imageUrl ? (
-                      <img src={f.imageUrl} alt={f.title + " 대표 이미지"} />
+                      <img
+                        src={f.imageUrl}
+                        alt={f.title + " 대표 이미지"}
+                        loading="lazy"
+                      />
                     ) : (
                       <>
                         <span className="art-symbol" aria-hidden="true">
@@ -318,7 +463,11 @@ export function Explorer() {
                       </>
                     )}
                     <span className="card-tag">
-                      {demo ? "가상 축제" : "축제 · 행사"}
+                      {demo
+                        ? "가상 축제"
+                        : isLongRunning(f)
+                          ? "31일 이상 행사"
+                          : "30일 이하 행사"}
                     </span>
                     <SaveButton id={f.contentId} />
                   </div>
@@ -333,7 +482,13 @@ export function Explorer() {
                       </h3>
                     </Link>
                     <p>
-                      {f.startDate} — {f.endDate}
+                      전체 기간 · {f.startDate} — {f.endDate}
+                    </p>
+                    <p className="schedule-note">
+                      매일 열리는 행사는 아닐 수 있어요.{" "}
+                      <Link href={"/festivals/" + f.contentId}>
+                        운영 요일·시간 확인 ↗
+                      </Link>
                     </p>
                     <button
                       className="map-select"
