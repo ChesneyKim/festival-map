@@ -1,0 +1,87 @@
+import { dateRange, addDays, normalize, type FestivalDetail } from "./domain";
+export function fixtures(): FestivalDetail[] {
+  const { start } = dateRange("weekend");
+  return [
+    [
+      "demo-1",
+      "강변의 빛, 가을밤 산책",
+      "경남 창원시",
+      "48",
+      35.228,
+      128.681,
+      "빛을 따라 걷고, 함께 오래 머무는 저녁.",
+    ],
+    [
+      "demo-2",
+      "작은 정원 꽃 축제",
+      "경남 함안군",
+      "48",
+      35.272,
+      128.407,
+      "천천히 걸으며 계절의 색을 발견해요.",
+    ],
+    [
+      "demo-3",
+      "바다 옆 재즈 피크닉",
+      "부산 수영구",
+      "26",
+      35.153,
+      129.119,
+      "바닷바람과 음악으로 채우는 주말.",
+    ],
+    [
+      "demo-4",
+      "한강 가을 문화 산책",
+      "서울 영등포구",
+      "11",
+      37.528,
+      126.934,
+      "익숙한 도시에서 만나는 새로운 장면.",
+    ],
+    [
+      "demo-5",
+      "숲속 작은 음악회",
+      "경기 수원시",
+      "41",
+      37.285,
+      127.036,
+      "나무 그늘 아래 함께 쉬어가는 시간.",
+    ],
+    [
+      "demo-6",
+      "돌담길 가을 마켓",
+      "제주 제주시",
+      "50",
+      33.499,
+      126.531,
+      "손으로 만든 작은 물건과 느긋한 오후.",
+    ],
+  ].map(([id, title, addr, region, lat, lng, overview], i) => ({
+    ...normalize({
+      contentid: id,
+      title,
+      addr1: addr,
+      lDongRegnCd: region,
+      mapy: lat,
+      mapx: lng,
+      eventstartdate: addDays(start, -3),
+      eventenddate: addDays(start, 3 + i),
+    })!,
+    overview: String(overview),
+    eventPlace: null,
+    program: null,
+    performanceTime: null,
+    fee: null,
+    parking: null,
+    bookingPlace: null,
+    homepageUrl: null,
+    contact: null,
+  }));
+}
+export const demoRegions = [
+  { code: "11", name: "서울" },
+  { code: "26", name: "부산" },
+  { code: "41", name: "경기" },
+  { code: "48", name: "경남" },
+  { code: "50", name: "제주" },
+];
