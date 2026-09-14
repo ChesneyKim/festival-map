@@ -19,7 +19,14 @@ export function db(write = false) {
     key = write
       ? process.env.SUPABASE_SERVER_SECRET_KEY
       : process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-  if (!url || !key) throw new Error("Database is not configured");
+  if (!url || !key) {
+    console.error("database_configuration_missing", {
+      access: write ? "server" : "public",
+      urlPresent: !!url,
+      keyPresent: !!key,
+    });
+    throw new Error("Database is not configured");
+  }
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -79,7 +86,13 @@ export async function list(
     .order("start_date")
     .order("content_id")
     .range((page - 1) * limit, page * limit - 1);
-  if (error) throw new Error("Database read failed");
+  if (error) {
+    console.error("database_read_failed", {
+      operation: "festivals",
+      code: /^[A-Z0-9_]{1,32}$/.test(error.code) ? error.code : "unknown",
+    });
+    throw new Error("Database read failed");
+  }
   return {
     items: (data ?? []).map((r) => summary(r.data)),
     total: count ?? 0,
@@ -175,6 +188,12 @@ export async function regions() {
     .from("regions")
     .select("code,name,district_code,district_name")
     .order("code");
-  if (error) throw new Error("Regions unavailable");
+  if (error) {
+    console.error("database_read_failed", {
+      operation: "regions",
+      code: /^[A-Z0-9_]{1,32}$/.test(error.code) ? error.code : "unknown",
+    });
+    throw new Error("Regions unavailable");
+  }
   return data ?? [];
 }

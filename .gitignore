@@ -8,3 +8,4 @@ node_modules/
 *.token
 *.key
 .vercel
+.DS_Store
