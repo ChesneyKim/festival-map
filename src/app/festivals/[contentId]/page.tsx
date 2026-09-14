@@ -2,7 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { detail } from "@/lib/server";
 import { today, safeUrl } from "@/lib/domain";
-import { SaveButton, ShareButton } from "@/components/save-button";
+import {
+  KakaoShareButton,
+  SaveButton,
+  ShareButton,
+} from "@/components/save-button";
 export const dynamic = "force-dynamic";
 export default async function Page({
   params,
@@ -46,7 +50,12 @@ export default async function Page({
           </div>
           <div className="detail-actions">
             <SaveButton id={f.contentId} />
-            <ShareButton />
+            <KakaoShareButton
+              title={f.title}
+              startDate={f.startDate}
+              endDate={f.endDate}
+            />
+            <ShareButton title={f.title} />
           </div>
         </div>
         {f.imageUrl ? (

@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   dateRange,
   today,
@@ -25,6 +25,8 @@ export function Explorer() {
     [notice, setNotice] = useState(""),
     [locating, setLocating] = useState(false),
     [selected, setSelected] = useState(""),
+    [hovered, setHovered] = useState(""),
+    [sheetExpanded, setSheetExpanded] = useState(false),
     [items, setItems] = useState<FestivalSummary[]>([]),
     [regions, setRegions] = useState<Region[]>([]),
     [demo, setDemo] = useState(false),
@@ -39,6 +41,9 @@ export function Explorer() {
   const [customStart, setCustomStart] = useState("");
   const [customEnd, setCustomEnd] = useState("");
   const [regionError, setRegionError] = useState(false);
+  const resultsScroll = useRef<HTMLDivElement>(null);
+  const touchStart = useRef<number | null>(null);
+  const swiped = useRef(false);
   const range =
     preset === "custom"
       ? { start: customStart, end: customEnd }
@@ -129,16 +134,31 @@ export function Explorer() {
   );
   const select = useCallback((id: string) => {
     setSelected(id);
-    document
-      .getElementById("card-" + id)
-      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    setSheetExpanded(true);
+    requestAnimationFrame(() => {
+      const card = document.getElementById("card-" + id);
+      const scroller = resultsScroll.current;
+      if (!card) return;
+      if (window.matchMedia("(max-width: 743px)").matches && scroller) {
+        scroller.scrollTo({
+          top:
+            scroller.scrollTop +
+            card.getBoundingClientRect().top -
+            scroller.getBoundingClientRect().top -
+            16,
+          behavior: "smooth",
+        });
+      } else {
+        card.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    });
   }, []);
   async function locate() {
     setLocating(true);
     setNotice("위치를 확인하고 있어요. 브라우저의 권한 요청을 확인해 주세요.");
     try {
       setPosition(await requestPosition(navigator.geolocation));
-      setRadius(30);
+      setRadius(10);
       setRegion("");
       setDistrict("");
       setSort("distance");
@@ -324,7 +344,7 @@ export function Explorer() {
                 value={radius}
                 onChange={(e) => setRadius(Number(e.target.value))}
               >
-                {[10, 30, 50].map((n) => (
+                {[5, 10, 30, 50].map((n) => (
                   <option key={n} value={n}>
                     {n}km 이내
                   </option>
@@ -394,114 +414,190 @@ export function Explorer() {
             {notice}
           </p>
         )}
-        <div id="festival-map">
-          <FestivalMap items={nearby} selected={selected} onSelect={select} />
-        </div>
-        <section id="festivals" className="results">
-          <div className="results-heading">
-            <h2>
-              {position ? "우리 가까이, 가볼 만한 곳" : "함께 가면 더 좋은 곳"}{" "}
-              <span>{nearby.length}</span>
-            </h2>
-            <p>
-              {range.start} — {range.end} ·{" "}
-              {sort === "distance"
-                ? "가까운 순 · 직선거리"
-                : sort === "starting"
-                  ? "개최 예정 먼저"
-                  : "종료일 가까운 순"}
-            </p>
+        <div
+          className={"explore-stage " + (sheetExpanded ? "sheet-expanded" : "")}
+        >
+          <div id="festival-map">
+            <FestivalMap
+              items={nearby}
+              selected={selected}
+              hovered={hovered}
+              position={position}
+              radius={radius}
+              onSelect={select}
+              onHover={setHovered}
+            />
           </div>
-          {busy ? (
-            <div className="empty" role="status">
-              함께 가볼 축제를 찾고 있어요…
-            </div>
-          ) : error ? (
-            <div className="empty" role="alert">
-              {error}
-              <br />
-              <button onClick={() => setRetry((n) => n + 1)}>
-                다시 불러오기
-              </button>
-            </div>
-          ) : !nearby.length ? (
-            <div className="empty">
-              <h3>조금 더 넓게 찾아볼까요?</h3>
-              <p>
-                현재 조건에 맞는 축제가 없어요. 검색어, 지역, 날짜나 기간 길이를
-                바꿔보세요.
-              </p>
-            </div>
-          ) : (
-            <div className="cards">
-              {nearby.map((f, i) => (
-                <article
-                  tabIndex={0}
-                  id={"card-" + f.contentId}
-                  key={f.contentId}
-                  className={
-                    "card " + (selected === f.contentId ? "selected" : "")
-                  }
-                  onClick={() => setSelected(f.contentId)}
-                  onFocus={() => setSelected(f.contentId)}
+          <section id="festivals" className="results">
+            <button
+              className="sheet-handle"
+              type="button"
+              aria-expanded={sheetExpanded}
+              aria-controls="festival-results-scroll"
+              onTouchStart={(event) => {
+                touchStart.current = event.touches[0].clientY;
+              }}
+              onTouchEnd={(event) => {
+                if (touchStart.current === null) return;
+                const delta =
+                  event.changedTouches[0].clientY - touchStart.current;
+                touchStart.current = null;
+                if (Math.abs(delta) < 45) return;
+                swiped.current = true;
+                setSheetExpanded(delta < 0);
+              }}
+              onClick={() => {
+                if (swiped.current) {
+                  swiped.current = false;
+                  return;
+                }
+                setSheetExpanded((expanded) => !expanded);
+              }}
+            >
+              <span aria-hidden="true" />
+              {sheetExpanded ? "지도 크게 보기" : "축제 목록 펼치기"}
+            </button>
+            <div
+              className="results-scroll"
+              id="festival-results-scroll"
+              ref={resultsScroll}
+            >
+              <div className="results-heading">
+                <h2>
+                  {position
+                    ? "우리 가까이, 가볼 만한 곳"
+                    : "함께 가면 더 좋은 곳"}{" "}
+                  <span>{nearby.length}</span>
+                </h2>
+                <p>
+                  {range.start} — {range.end} ·{" "}
+                  {sort === "distance"
+                    ? "가까운 순 · 직선거리"
+                    : sort === "starting"
+                      ? "개최 예정 먼저"
+                      : "종료일 가까운 순"}
+                </p>
+              </div>
+              {busy ? (
+                <div
+                  className="loading-results"
+                  role="status"
+                  aria-label="함께 가볼 축제를 찾고 있어요"
                 >
-                  <div className={"card-art art-" + (i % 4)}>
-                    {f.imageUrl ? (
-                      <img
-                        src={f.imageUrl}
-                        alt={f.title + " 대표 이미지"}
-                        loading="lazy"
-                      />
-                    ) : (
-                      <>
-                        <span className="art-symbol" aria-hidden="true">
-                          ✳
-                        </span>
-                        <small>
-                          {demo ? "가상 축제 미리보기" : "이미지 준비 중"}
-                        </small>
-                      </>
-                    )}
-                    <span className="card-tag">
-                      {demo
-                        ? "가상 축제"
-                        : isLongRunning(f)
-                          ? "31일 이상 행사"
-                          : "30일 이하 행사"}
-                    </span>
-                    <SaveButton id={f.contentId} />
+                  <p>함께 가볼 축제를 찾고 있어요…</p>
+                  <div className="skeleton-grid" aria-hidden="true">
+                    {Array.from({ length: 4 }, (_, index) => (
+                      <div className="skeleton-card" key={index}>
+                        <div className="skeleton-image" />
+                        <div className="skeleton-line" />
+                        <div className="skeleton-line short" />
+                      </div>
+                    ))}
                   </div>
-                  <div className="card-content">
-                    <div className="card-meta">
-                      {f.address || "장소 확인 중"}
-                      {f.km !== null && <span>직선 {f.km.toFixed(1)}km</span>}
-                    </div>
-                    <Link href={"/festivals/" + f.contentId}>
-                      <h3>
-                        {f.title} <span>↗</span>
-                      </h3>
-                    </Link>
-                    <p>
-                      전체 기간 · {f.startDate} — {f.endDate}
-                    </p>
-                    <p className="schedule-note">
-                      매일 열리는 행사는 아닐 수 있어요.{" "}
-                      <Link href={"/festivals/" + f.contentId}>
-                        운영 요일·시간 확인 ↗
-                      </Link>
-                    </p>
-                    <button
-                      className="map-select"
-                      onClick={() => select(f.contentId)}
-                    >
-                      지도에서 선택 ⌖
+                </div>
+              ) : error ? (
+                <div className="empty" role="alert">
+                  {error}
+                  <br />
+                  <button onClick={() => setRetry((n) => n + 1)}>
+                    다시 불러오기
+                  </button>
+                </div>
+              ) : !nearby.length ? (
+                <div className="empty">
+                  <span className="empty-symbol" aria-hidden="true">
+                    ✳
+                  </span>
+                  <h3>앗! 조건에 맞는 축제가 없어요</h3>
+                  <p>
+                    {position
+                      ? "가까운 축제가 보이지 않아요. 반경을 넓히거나 날짜를 바꿔보세요."
+                      : "선택한 날짜와 지역에 진행 중인 축제가 없어요. 다른 조건을 골라보세요."}
+                  </p>
+                  {position ? (
+                    <button onClick={() => setRadius(50)}>50km로 넓히기</button>
+                  ) : (
+                    <button onClick={() => setPreset("month")}>
+                      30일간 둘러보기
                     </button>
-                  </div>
-                </article>
-              ))}
+                  )}
+                </div>
+              ) : (
+                <div className="cards">
+                  {nearby.map((f, i) => (
+                    <article
+                      tabIndex={0}
+                      id={"card-" + f.contentId}
+                      key={f.contentId}
+                      className={
+                        "card " + (selected === f.contentId ? "selected" : "")
+                      }
+                      onClick={() => setSelected(f.contentId)}
+                      onFocus={() => setSelected(f.contentId)}
+                      onMouseEnter={() => setHovered(f.contentId)}
+                      onMouseLeave={() => setHovered("")}
+                    >
+                      <div className={"card-art art-" + (i % 4)}>
+                        {f.imageUrl ? (
+                          <img
+                            src={f.imageUrl}
+                            alt={f.title + " 대표 이미지"}
+                            loading="lazy"
+                          />
+                        ) : (
+                          <>
+                            <span className="art-symbol" aria-hidden="true">
+                              ✳
+                            </span>
+                            <small>
+                              {demo ? "가상 축제 미리보기" : "이미지 준비 중"}
+                            </small>
+                          </>
+                        )}
+                        <span className="card-tag">
+                          {demo
+                            ? "가상 축제"
+                            : isLongRunning(f)
+                              ? "31일 이상 행사"
+                              : "30일 이하 행사"}
+                        </span>
+                        <SaveButton id={f.contentId} />
+                      </div>
+                      <div className="card-content">
+                        <div className="card-meta">
+                          {f.address || "장소 확인 중"}
+                          {f.km !== null && (
+                            <span>직선 {f.km.toFixed(1)}km</span>
+                          )}
+                        </div>
+                        <Link href={"/festivals/" + f.contentId}>
+                          <h3>
+                            {f.title} <span>↗</span>
+                          </h3>
+                        </Link>
+                        <p>
+                          전체 기간 · {f.startDate} — {f.endDate}
+                        </p>
+                        <p className="schedule-note">
+                          매일 열리는 행사는 아닐 수 있어요.{" "}
+                          <Link href={"/festivals/" + f.contentId}>
+                            운영 요일·시간 확인 ↗
+                          </Link>
+                        </p>
+                        <button
+                          className="map-select"
+                          onClick={() => select(f.contentId)}
+                        >
+                          지도에서 선택 ⌖
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </section>
+          </section>
+        </div>
       </main>
       <footer>
         <Link href="/" className="brand">

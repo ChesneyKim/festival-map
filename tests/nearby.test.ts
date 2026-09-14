@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { nearbyFestivals, requestPosition } from "../src/lib/nearby";
 import { fixtures } from "../src/lib/fixtures";
 
-test("10/30/50 km radii include boundaries, exclude missing coordinates and sort nearest first", () => {
+test("5/10/30/50 km radii include boundaries, exclude missing coordinates and sort nearest first", () => {
   const base = fixtures()[0];
   const rows = [45, 25, 5].map((km) => ({
     ...base,
@@ -17,6 +17,10 @@ test("10/30/50 km radii include boundaries, exclude missing coordinates and sort
     latitude: null,
     longitude: null,
   };
+  assert.deepEqual(
+    nearbyFestivals([...rows, missing], [0, 0], 5).map((r) => r.contentId),
+    ["5"],
+  );
   assert.deepEqual(
     nearbyFestivals([...rows, missing], [0, 0], 10).map((r) => r.contentId),
     ["5"],

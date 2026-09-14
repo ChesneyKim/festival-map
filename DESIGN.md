@@ -338,6 +338,14 @@ components:
 - 카드 그리드·정보 위계·여백은 유지한다. 데모 빈 이미지에는 연한 살구색·버터 옐로·피치색을 쓰되 실제 축제 이미지에는 색상 필터를 적용하지 않는다.
 - 시스템 폰트를 사용한다. 기능·접근성·원본 이미지 저작권 제약은 계속 지킨다.
 
+### 축제 탐색 화면 패턴
+
+- 축제 카드는 사진이 먼저 보이도록 이미지를 정사각형 영역에 가득 채우고, 찜 버튼은 사진 우측 상단에 겹쳐 둔다.
+- 지도 핀과 카드는 같은 선택 상태를 사용한다. 핀 선택은 해당 카드로 이동하고, 카드 호버·포커스는 핀을 강조한다.
+- 로딩 중에는 사진과 텍스트 모양의 스켈레톤을 사용한다. 결과가 없으면 조건 변경을 안내하는 문장과 바로 실행할 수 있는 버튼을 제공한다.
+- 모바일 지도 결과는 화면 높이의 지도 위에 바텀 시트를 겹친다. 시트는 핸들 탭과 위아래 스와이프로 접고 펼칠 수 있어야 한다.
+- 위치 기반 반경은 지도에 범위를 표시하며 5·10·30·50km를 제공한다. 거리는 직선거리임을 함께 안내한다.
+
 ## Overview
 
 Airbnb is the canonical example of a generous, photography-led consumer marketplace. The base canvas is **pure white** (`{colors.canvas}` — #ffffff) with deep near-black ink (`{colors.ink}` — #222222) for headlines and body, and a single voltage of **Rausch** (`{colors.primary}` — #ff385c) carrying every primary CTA, the search-button orb, the heart save state, and inline brand links. There is no secondary brand color in mainline marketing — the **Luxe purple** (`{colors.luxe}` — #460479) and **Plus magenta** (`{colors.plus}` — #92174d) tokens are sub-brand accents that only appear inside Airbnb Luxe / Plus contexts.

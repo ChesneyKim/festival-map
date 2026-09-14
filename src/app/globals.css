@@ -458,7 +458,11 @@ main {
 .card-art img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
+}
+.card:hover .card-art,
+.card:focus-within .card-art {
+  box-shadow: var(--shadow);
 }
 .art-1 {
   background: #fff0b8;
@@ -592,6 +596,53 @@ main.empty {
   color: var(--ink);
   border: 0;
 }
+.empty-symbol {
+  display: block;
+  color: var(--primary);
+  font-size: 48px;
+  line-height: 1;
+  margin-bottom: 16px;
+}
+.loading-results > p {
+  color: var(--muted);
+  margin: 0 0 16px;
+}
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.skeleton-image,
+.skeleton-line {
+  background: linear-gradient(
+    100deg,
+    var(--surface) 30%,
+    var(--surface-strong) 48%,
+    var(--surface) 65%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+.skeleton-image {
+  aspect-ratio: 1;
+  border-radius: var(--radius);
+}
+.skeleton-line {
+  height: 16px;
+  border-radius: 8px;
+  margin-top: 12px;
+}
+.skeleton-line.short {
+  width: 65%;
+}
+@keyframes skeleton-shimmer {
+  to {
+    background-position-x: -200%;
+  }
+}
+.sheet-handle {
+  display: none;
+}
 .detail {
   max-width: 1144px;
   padding-top: 32px;
@@ -618,6 +669,12 @@ main.empty {
   gap: 12px;
   align-items: center;
   flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.kakao-share {
+  background: var(--surface-strong);
+  border-color: var(--line);
+  font-weight: 600;
 }
 .detail-actions > button:not(.save) {
   border: 0;
@@ -769,6 +826,9 @@ footer small {
   .cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .skeleton-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .brand small,
   .topbar > .nav-link {
     display: none;
@@ -882,7 +942,65 @@ footer small {
     padding: 12px 16px;
   }
   .map {
-    height: 300px;
+    height: 100%;
+    border-radius: 0;
+  }
+  .explore-stage {
+    position: relative;
+    height: calc(100dvh - 72px);
+    min-height: 460px;
+    margin: 0 -24px 24px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .explore-stage > #festival-map {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+  .explore-stage .results {
+    position: absolute;
+    z-index: 100;
+    inset: auto 0 0;
+    height: 230px;
+    padding: 0;
+    background: var(--canvas);
+    border-radius: 24px 24px 0 0;
+    box-shadow: 0 -8px 28px #30271f1a;
+    display: flex;
+    flex-direction: column;
+    transition: height 240ms ease;
+  }
+  .explore-stage.sheet-expanded .results {
+    height: min(78dvh, 720px);
+  }
+  .sheet-handle {
+    display: flex;
+    width: 100%;
+    flex: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-height: 56px;
+    padding: 8px 16px;
+    background: transparent;
+    border: 0;
+    color: var(--muted);
+    font-size: 12px;
+    touch-action: pan-y;
+  }
+  .sheet-handle span {
+    width: 36px;
+    height: 5px;
+    border-radius: 9999px;
+    background: var(--line);
+  }
+  .results-scroll {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0 24px 24px;
   }
   .map-message {
     padding: 16px;
@@ -916,6 +1034,9 @@ footer small {
   .cards {
     grid-template-columns: minmax(0, 1fr);
     gap: 24px;
+  }
+  .skeleton-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
   .card-content {
     padding-top: 12px;
@@ -1001,6 +1122,15 @@ footer small {
   }
   .empty h1 {
     font-size: 22px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-image,
+  .skeleton-line {
+    animation: none;
+  }
+  .explore-stage .results {
+    transition: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {
